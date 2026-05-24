@@ -1,0 +1,103 @@
+# profile.example.yaml - Candidate Profile
+#
+# Copy this file to `profile.yaml` and fill in your details.
+# The pipeline reads `profile.yaml` at runtime to:
+#   - score every fetched job against your fit criteria
+#   - classify each match into follow-up tracks
+#   - substitute placeholders into the templates under templates/
+
+# ----------------------------------------------------------------------
+# Identity (used in draft templates as {{name}}, {{headline}}, etc.)
+# ----------------------------------------------------------------------
+name: "Your Name"
+headline: "Short one-line professional summary."
+focus_areas:
+  - "Backend automation and pipelines"
+  - "API integration and data engineering"
+
+# ----------------------------------------------------------------------
+# Highlights to substitute into follow-up drafts as bullets
+# ----------------------------------------------------------------------
+highlights:
+  - "Concrete shipped artefact or outcome 1"
+  - "Concrete shipped artefact or outcome 2"
+  - "Senior-level scope / years of experience"
+  - "Domain credentials (publication, certification, public repo)"
+
+# ----------------------------------------------------------------------
+# Keyword scoring (matched against job title + description)
+# ----------------------------------------------------------------------
+# `keywords_must_have`     - strong positive signal. Default weight: 8 pts each, capped at 40.
+# `keywords_nice_to_have`  - moderate positive signal.  Default weight: 5 pts each, capped at 20.
+# `keywords_weak_positive` - light positive signal.     Default weight: 3 pts each, capped at 10.
+# `keywords_deal_breaker`  - strong negative signal.    Default weight: -10 pts each, no cap.
+# `keywords_seniority`     - bonus for senior listings. Default weight: 8 pts each, capped at 15.
+
+keywords_must_have:
+  - "python"
+  - "data pipeline"
+  - "api integration"
+
+keywords_nice_to_have:
+  - "etl"
+  - "rest"
+  - "automation"
+  - "workflow"
+
+keywords_weak_positive:
+  - "scripting"
+  - "integration"
+  - "monitoring"
+  - "observability"
+
+keywords_deal_breaker:
+  - "wordpress only"
+  - "no remote"
+  - "on-site only"
+
+keywords_seniority:
+  - "senior"
+  - "lead"
+  - "staff"
+  - "principal"
+  - "head"
+  - "director"
+  - "manager"
+
+# ----------------------------------------------------------------------
+# Location filters (used to classify matches into follow-up tracks)
+# ----------------------------------------------------------------------
+locations_acceptable:
+  - "remote"
+  - "berlin"
+  - "london"
+  - "lisbon"
+  - "amsterdam"
+
+# ----------------------------------------------------------------------
+# Compensation floor (optional; null disables the filter)
+# ----------------------------------------------------------------------
+min_salary_eur: null
+
+# ----------------------------------------------------------------------
+# Scoring weights - override the defaults above if you want to tune them
+# ----------------------------------------------------------------------
+weights:
+  must_have: 8.0
+  must_have_cap: 40.0
+  nice_to_have: 5.0
+  nice_to_have_cap: 20.0
+  weak_positive: 3.0
+  weak_positive_cap: 10.0
+  deal_breaker: -10.0
+  seniority: 8.0
+  seniority_cap: 15.0
+
+# ----------------------------------------------------------------------
+# Follow-up gating thresholds
+# ----------------------------------------------------------------------
+# Roles scoring >= `track_a_threshold` go to "tailored follow-up" track.
+# Roles scoring >= `track_b_threshold` go to "light follow-up" track.
+# Roles below `track_b_threshold` are kept in the CSV but not drafted for.
+track_a_threshold: 50
+track_b_threshold: 30

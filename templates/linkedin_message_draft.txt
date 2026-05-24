@@ -1,0 +1,1 @@
+Hi, your {{title}} role at {{company}} caught my eye. I'm {{name}}, {{headline}}. My background in {{brief}} aligns with what the listing describes. {{track_bit}}Would be glad to compare notes if relevant.

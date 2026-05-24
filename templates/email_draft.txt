@@ -1,0 +1,18 @@
+Subject: {{title}} role at {{company}}: fit notes
+
+Hi {{company}} team,
+
+I'm {{name}}, {{headline}}.
+
+Your {{title}} role stood out. Here's why I'd be a strong fit:
+
+{{bullet_lines}}
+
+Beyond these, my background includes:
+{{focus_areas_block}}
+
+Would value a 20-minute conversation to learn more about how the team
+works and where this role sits on your roadmap.
+
+Best,
+{{name}}
