@@ -1,0 +1,44 @@
+# CLAUDE.md — job-board-pipeline
+
+> This repository is PUBLIC. Keep this file public-safe: no personal contact details, no private job-search strategy, no private repo links, no real profile data, no secrets, no API keys, no employer-specific notes, no application targets.
+
+## 1. Project purpose
+Public portfolio version of a job-search pipeline: fetch -> score -> classify -> draft -> (optional) send. Pulls postings from official public board APIs, scores them against a keyword profile, classifies into Track A/B, and writes a CSV, per-job draft messages, and a machine-readable shortlist. Sending is disabled by default; portfolio behavior is to write files to disk only.
+
+## 2. Current implementation
+- Python 3.10+ (developed on 3.14), pip. Deps: requests, python-dotenv, PyYAML. No lockfile; pytest not installed locally.
+- Run: `python3 pipeline.py` (dry-run default). Flags: `--limit N`, `--dry-run`, `--send` (gated; requires DRY_RUN=false in .env).
+- pipeline.py — single-file main: hardcoded SOURCES list (currently placeholder tokens), fetch, score_job(), classify_track(), write_outputs(), optional SMTP digest.
+- shortlist.py — pure stdlib helpers (no third-party imports): make_job_id() for stable job IDs, build_shortlist_payload() for the JSON payload. MUST stay dependency-free so it is testable without network, creds, or profile.yaml.
+- test_shortlist.py — 5 tests; runs under pytest or directly via `python3 test_shortlist.py` (stdlib fallback).
+- Sources: Greenhouse and Lever public board APIs only. No scraping, RSS, or CSV input.
+- Latest public commit: 7fcf8e5 "Emit machine-readable shortlisted jobs JSON" on origin/main.
+
+## 3. Safety and privacy rules
+- Sending stays disabled by default. `--send` requires DRY_RUN=false; never flip the default.
+- Never commit: .env, profile.yaml, state.json, outputs/, *.csv, drafts, or any real personal data. Only .env.example and profile.example.yaml are committed examples.
+- Keep this repo's content public-safe. profile.example.yaml is illustrative placeholder data only.
+- No new job sources, and no auto-apply or automated sending, without an explicit request.
+- Do not change scoring logic, source fetching, or SMTP behavior as a side effect of unrelated work.
+
+## 4. Verification commands
+- `python3 -m py_compile pipeline.py shortlist.py test_shortlist.py`
+- `python3 test_shortlist.py`
+- `grep -rn "SMTP_PASSWORD\|EMAIL_PASSWORD\|API_KEY\|SECRET\|TOKEN" . --exclude-dir=.git --exclude=.env.example` (expect no matches)
+
+## 5. Output contract
+- outputs/jobs-<ts>.csv — timestamped; columns: score,track,company,title,location,url,source,id
+- outputs/drafts-<ts>/NNN-company-title.{email,linkedin}.txt
+- outputs/shortlisted_jobs.json — fixed filename (overwritten each run), schema_version 1.0, Track A/B only, sorted score-descending. Each job: job_id, source, source_id, company, title, location, url, score, track, status="shortlisted", raw.
+- All of outputs/ is gitignored.
+- shortlisted_jobs.json is the bridge output intended for a separate downstream application-generation project; treat its shape as a stable contract.
+
+## 6. Known gaps / next steps
+- Source config is hardcoded in pipeline.py (placeholder tokens); should move to data-driven config later. Will not return real jobs until edited.
+- Deduplication: not implemented (re-runs re-emit everything).
+- State tracking: state.json is gitignored and currently unused; no seen/applied/rejected lifecycle. job_id is intentionally stable so a future state layer can key off it.
+- Hard filters for location, visa, relocation, timezone, and salary are not implemented (profile keys exist but are not read by the scorer; only soft keyword scoring applies).
+- No CI.
+
+## 7. Checkpoint protocol
+At the end of any task that changes the repo, update this file: record what shipped (with commit hash) in section 2, and revise section 6. Keep it public-safe. Stop before irreversible actions (commit, push, send) unless explicitly told to proceed.
