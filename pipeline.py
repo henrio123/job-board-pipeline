@@ -35,6 +35,8 @@ import requests
 import yaml
 from dotenv import load_dotenv
 
+from shortlist import build_shortlist_payload
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -269,7 +271,15 @@ def write_outputs(jobs_scored: list[dict[str, Any]], profile: Profile) -> Path:
             (base.with_suffix(".email.txt")).write_text(row["email_draft"], encoding="utf-8")
             (base.with_suffix(".linkedin.txt")).write_text(row["linkedin_draft"], encoding="utf-8")
 
-    log.info("Wrote %s and %s", csv_path, drafts_dir)
+    # Machine-readable shortlist of Track A/B jobs, reusing the already-scored,
+    # already-sorted rows. Fixed filename (overwritten each run), unlike the CSV.
+    shortlist_path = OUTPUTS_DIR / "shortlisted_jobs.json"
+    payload = build_shortlist_payload(jobs_scored, datetime.now(timezone.utc).isoformat())
+    shortlist_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    log.info("Wrote %s, %s and %s", csv_path, drafts_dir, shortlist_path)
     return csv_path
 
 
