@@ -10,9 +10,10 @@ Public portfolio version of a job-search pipeline: fetch -> score -> classify ->
 - Run: `python3 pipeline.py` (dry-run default). Flags: `--limit N`, `--dry-run`, `--send` (gated; requires DRY_RUN=false in .env).
 - pipeline.py — single-file main: load_sources() (reads gitignored sources.yaml; SOURCES_PATH override; exits with an error if the file is missing, the `sources` list is empty, or an entry lacks type/token/company — no fallback sources), fetch, score_job(), classify_track(), write_outputs(), optional SMTP digest. sources.example.yaml is the tracked placeholder template.
 - shortlist.py — pure stdlib helpers (no third-party imports): make_job_id() for stable job IDs, build_shortlist_payload() for the JSON payload. MUST stay dependency-free so it is testable without network, creds, or profile.yaml.
-- test_shortlist.py — 5 tests; runs under pytest or directly via `python3 test_shortlist.py` (stdlib fallback).
+- Keyword matching is word-boundary based via keyword_matches() (case-insensitive, phrase- and hyphen-aware; substring false positives like "ai" inside "email" do not score). Used by both keyword_score() and the deal-breaker check.
+- test_shortlist.py — 5 tests; test_scoring.py — 8 tests for word-boundary keyword matching. Both run under pytest or directly via `python3 <file>` (stdlib fallback).
 - Sources: Greenhouse and Lever public board APIs only. No scraping, RSS, or CSV input.
-- Latest public commit: 7fcf8e5 "Emit machine-readable shortlisted jobs JSON" on origin/main.
+- Latest public commit: bdc3d8f "Move watched company sources to local config" on origin/main (word-boundary scoring fix lands in the commit after it).
 
 ## 3. Safety and privacy rules
 - Sending stays disabled by default. `--send` requires DRY_RUN=false; never flip the default.
@@ -22,8 +23,9 @@ Public portfolio version of a job-search pipeline: fetch -> score -> classify ->
 - Do not change scoring logic, source fetching, or SMTP behavior as a side effect of unrelated work.
 
 ## 4. Verification commands
-- `python3 -m py_compile pipeline.py shortlist.py test_shortlist.py`
+- `python3 -m py_compile pipeline.py shortlist.py test_shortlist.py test_scoring.py`
 - `python3 test_shortlist.py`
+- `python3 test_scoring.py`
 - `grep -rn "SMTP_PASSWORD\|EMAIL_PASSWORD\|API_KEY\|SECRET\|TOKEN" . --exclude-dir=.git --exclude=.env.example` (expect no matches)
 
 ## 5. Output contract
