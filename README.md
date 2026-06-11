@@ -10,7 +10,7 @@ Public portfolio version. Personal profile data, real follow-up history, and gen
 
 ## What it does
 
-1. **Fetch**: pulls job listings from the public Greenhouse and Lever board APIs for the companies listed in `SOURCES` inside `pipeline.py`.
+1. **Fetch**: pulls job listings from the public Greenhouse and Lever board APIs for the companies listed in `sources.yaml` (local and gitignored; see `sources.example.yaml` for the schema).
 2. **Score**: scores every fetched job against `profile.yaml`. Must-have keywords (capped positive), nice-to-have keywords (capped positive), weak-positive keywords (small cap), deal-breaker keywords (uncapped negative), and seniority keywords (small cap).
 3. **Classify**: routes each match into one of three follow-up tracks based on score thresholds in `profile.yaml`:
    - **Track A** (`>= track_a_threshold`): tailored follow-up drafts.
@@ -38,6 +38,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 cp profile.example.yaml profile.yaml          # then edit profile.yaml
+cp sources.example.yaml sources.yaml          # then edit sources.yaml with real boards
 cp .env.example .env                          # leave DRY_RUN=true unless you want to send
 ```
 
@@ -45,7 +46,8 @@ cp .env.example .env                          # leave DRY_RUN=true unless you wa
 
 ```bash
 # 1. Edit profile.yaml with your name, headline, keywords, weights, thresholds.
-# 2. Edit SOURCES in pipeline.py with the Greenhouse/Lever company tokens you want to monitor.
+# 2. Edit sources.yaml with the Greenhouse/Lever company tokens you want to monitor.
+#    (sources.yaml is gitignored; never commit your real company list.)
 # 3. Run the pipeline (defaults are dry-run, no email):
 python3 pipeline.py
 
@@ -69,6 +71,7 @@ See `.env.example`. The relevant fields are:
 
 - `DRY_RUN`: defaults to `true`. Set `false` only if you also want to enable real sending. The CLI `--dry-run` flag forces dry-run regardless.
 - `PROFILE_PATH`: path to your candidate profile YAML. Defaults to `profile.yaml`.
+- `SOURCES_PATH`: path to your watched-company YAML. Defaults to `sources.yaml`. If the file is missing or its `sources` list is empty, the pipeline exits with an error pointing to `sources.example.yaml` — there is no fallback to built-in sources.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_TO`: only used when `DRY_RUN=false` and `--send` are both set.
 
 ## Project layout
@@ -77,6 +80,7 @@ See `.env.example`. The relevant fields are:
 job-board-pipeline/
 ├── pipeline.py                       # main script
 ├── profile.example.yaml              # candidate profile schema with example values
+├── sources.example.yaml              # watched-company schema with placeholder values
 ├── templates/
 │   ├── email_draft.txt               # email draft template
 │   └── linkedin_message_draft.txt    # LinkedIn DM template
@@ -92,7 +96,7 @@ job-board-pipeline/
 - A real `profile.yaml`: only `profile.example.yaml` ships, with placeholder values.
 - A real `.env`: only `.env.example` ships, with `DRY_RUN=true` and blank SMTP fields.
 - Any historical job exports, CSV reports, or sent drafts (everything under `outputs/`, `artifacts/`, `*.csv`, `*.jsonl` is gitignored).
-- Any specific company list. `SOURCES` ships as a 3-entry placeholder; edit it to monitor the boards you actually care about.
+- A real `sources.yaml`: only `sources.example.yaml` ships, with placeholder companies. Your real watched-company list lives in the gitignored `sources.yaml` and must never be committed.
 
 ## Notes on design
 

@@ -3,7 +3,8 @@
 
 The pipeline:
   1. Fetches job listings from the public Greenhouse and Lever board APIs
-     for the companies listed in `SOURCES` in this file.
+     for the companies listed in the local, gitignored `sources.yaml`
+     (schema in sources.example.yaml; path override via SOURCES_PATH).
   2. Scores each job against the candidate profile in `profile.yaml`.
   3. Classifies matches into follow-up tracks (A = tailored, B = light, C = log only).
   4. Writes a CSV report and per-job draft files under `outputs/`.
@@ -61,14 +62,41 @@ STATE_PATH = BASE_DIR / "state.json"
 # ---------------------------------------------------------------------------
 # Sources
 # ---------------------------------------------------------------------------
-# Trim this to the companies you actually want to monitor.
-# `type` is one of {"greenhouse", "lever"}. `token` is the company slug
-# in the board URL (boards.greenhouse.io/<token> or jobs.lever.co/<token>).
-SOURCES: list[dict[str, str]] = [
-    {"type": "greenhouse", "token": "example_company_one", "company": "Example Company One"},
-    {"type": "greenhouse", "token": "example_company_two", "company": "Example Company Two"},
-    {"type": "lever", "token": "example_company_three", "company": "Example Company Three"},
-]
+# The companies to monitor live in a local, gitignored `sources.yaml`
+# (see sources.example.yaml for the schema; override the path with
+# SOURCES_PATH). Each entry: `type` is one of {"greenhouse", "lever"},
+# `token` is the company slug in the board URL
+# (boards.greenhouse.io/<token> or jobs.lever.co/<token>), `company`
+# is the display name used in reports and drafts.
+
+SOURCE_REQUIRED_FIELDS = ("type", "token", "company")
+
+
+def load_sources(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        log.error(
+            "Sources config not found at %s. Copy sources.example.yaml to %s and edit it. "
+            "sources.yaml is gitignored; never commit your real company list.",
+            path,
+            path,
+        )
+        sys.exit(2)
+    with path.open("r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    sources = data.get("sources") if isinstance(data, dict) else None
+    if not isinstance(sources, list) or not sources:
+        log.error("%s must contain a non-empty 'sources' list. See sources.example.yaml.", path)
+        sys.exit(2)
+    for i, src in enumerate(sources):
+        if not isinstance(src, dict) or not all(src.get(k) for k in SOURCE_REQUIRED_FIELDS):
+            log.error(
+                "sources[%d] in %s must have non-empty fields %s. See sources.example.yaml.",
+                i,
+                path,
+                ", ".join(SOURCE_REQUIRED_FIELDS),
+            )
+            sys.exit(2)
+    return sources
 
 
 # ---------------------------------------------------------------------------
@@ -332,7 +360,10 @@ def run(args: argparse.Namespace) -> int:
     profile_path = Path(os.getenv("PROFILE_PATH", "profile.yaml"))
     profile = Profile.load(profile_path)
 
-    jobs = fetch_jobs(SOURCES)
+    sources_path = Path(os.getenv("SOURCES_PATH", "sources.yaml"))
+    sources = load_sources(sources_path)
+
+    jobs = fetch_jobs(sources)
     if args.limit:
         jobs = jobs[: args.limit]
 

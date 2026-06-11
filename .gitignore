@@ -6,6 +6,9 @@
 # Real candidate profile (never commit)
 profile.yaml
 
+# Real watched-company list (never commit)
+sources.yaml
+
 # Runtime / artifacts
 artifacts/
 outputs/

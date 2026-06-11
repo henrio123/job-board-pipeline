@@ -8,7 +8,7 @@ Public portfolio version of a job-search pipeline: fetch -> score -> classify ->
 ## 2. Current implementation
 - Python 3.10+ (developed on 3.14), pip. Deps: requests, python-dotenv, PyYAML. No lockfile; pytest not installed locally.
 - Run: `python3 pipeline.py` (dry-run default). Flags: `--limit N`, `--dry-run`, `--send` (gated; requires DRY_RUN=false in .env).
-- pipeline.py — single-file main: hardcoded SOURCES list (currently placeholder tokens), fetch, score_job(), classify_track(), write_outputs(), optional SMTP digest.
+- pipeline.py — single-file main: load_sources() (reads gitignored sources.yaml; SOURCES_PATH override; exits with an error if the file is missing, the `sources` list is empty, or an entry lacks type/token/company — no fallback sources), fetch, score_job(), classify_track(), write_outputs(), optional SMTP digest. sources.example.yaml is the tracked placeholder template.
 - shortlist.py — pure stdlib helpers (no third-party imports): make_job_id() for stable job IDs, build_shortlist_payload() for the JSON payload. MUST stay dependency-free so it is testable without network, creds, or profile.yaml.
 - test_shortlist.py — 5 tests; runs under pytest or directly via `python3 test_shortlist.py` (stdlib fallback).
 - Sources: Greenhouse and Lever public board APIs only. No scraping, RSS, or CSV input.
@@ -16,8 +16,8 @@ Public portfolio version of a job-search pipeline: fetch -> score -> classify ->
 
 ## 3. Safety and privacy rules
 - Sending stays disabled by default. `--send` requires DRY_RUN=false; never flip the default.
-- Never commit: .env, profile.yaml, state.json, outputs/, *.csv, drafts, or any real personal data. Only .env.example and profile.example.yaml are committed examples.
-- Keep this repo's content public-safe. profile.example.yaml is illustrative placeholder data only.
+- Never commit: .env, profile.yaml, sources.yaml, state.json, outputs/, *.csv, drafts, or any real personal data. Only .env.example, profile.example.yaml, and sources.example.yaml are committed examples.
+- Keep this repo's content public-safe. profile.example.yaml and sources.example.yaml are illustrative placeholder data only; real company tokens never go in tracked files.
 - No new job sources, and no auto-apply or automated sending, without an explicit request.
 - Do not change scoring logic, source fetching, or SMTP behavior as a side effect of unrelated work.
 
@@ -34,7 +34,7 @@ Public portfolio version of a job-search pipeline: fetch -> score -> classify ->
 - shortlisted_jobs.json is the bridge output intended for a separate downstream application-generation project; treat its shape as a stable contract.
 
 ## 6. Known gaps / next steps
-- Source config is hardcoded in pipeline.py (placeholder tokens); should move to data-driven config later. Will not return real jobs until edited.
+- Source config lives in gitignored sources.yaml. The tracked sources.example.yaml documents the schema. The pipeline will not return real jobs until a local sources.yaml with real, verified tokens exists.
 - Deduplication: not implemented (re-runs re-emit everything).
 - State tracking: state.json is gitignored and currently unused; no seen/applied/rejected lifecycle. job_id is intentionally stable so a future state layer can key off it.
 - Hard filters for location, visa, relocation, timezone, and salary are not implemented (profile keys exist but are not read by the scorer; only soft keyword scoring applies).

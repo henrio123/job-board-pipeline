@@ -1,0 +1,30 @@
+# sources.example.yaml - Watched company boards
+#
+# Copy this file to `sources.yaml` and replace the placeholder entries with
+# the companies you actually want to monitor.
+#
+# `sources.yaml` is gitignored on purpose: your real watched-company list is
+# personal job-search data and must never be committed to this public repo.
+#
+# Each entry:
+#   type:    "greenhouse" or "lever"
+#   token:   the company slug from the public board URL:
+#              https://boards.greenhouse.io/<token>
+#              https://jobs.lever.co/<token>
+#            Verify each token by opening the board URL in a browser first.
+#   company: display name used in the CSV report, drafts, and shortlist.
+#
+# The pipeline reads `sources.yaml` by default; set SOURCES_PATH in .env or
+# the environment to point somewhere else. If the file is missing or the
+# list is empty, the pipeline exits with an error instead of running.
+
+sources:
+  - type: greenhouse
+    token: example_company_one
+    company: Example Company One
+  - type: greenhouse
+    token: example_company_two
+    company: Example Company Two
+  - type: lever
+    token: example_company_three
+    company: Example Company Three
