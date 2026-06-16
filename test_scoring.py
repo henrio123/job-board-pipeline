@@ -9,7 +9,9 @@ Runs under pytest or directly: ``python3 test_scoring.py``.
 
 from __future__ import annotations
 
-from pipeline import Profile, keyword_matches, keyword_score, normalize, score_job
+from job_pipeline.classify import title_score
+from job_pipeline.matching import keyword_matches, keyword_score, normalize
+from pipeline import Profile, score_job
 
 # Substring traps the matcher must NOT fall into.
 NEGATIVE_CASES = [
@@ -123,6 +125,39 @@ def test_score_job_deal_breaker_word_boundary():
     # "commission-only" must not fire on unrelated text containing "only".
     unaffected = make_job("Credit risk and lending role. Use the commission portal only.")
     assert score_job(unaffected, profile) == score_job(base, profile)
+
+
+def test_title_strong_positive_boost():
+    # Strong "applied ai engineer" (+18) plus medium "fullstack" (+8).
+    assert title_score("Applied AI Engineer, Fullstack") >= 18
+    assert title_score("Applied AI Engineer, Fullstack") > title_score("Coordinator")
+
+
+def test_title_forward_deployed_agent_builder_boost():
+    assert title_score("Software Engineer, Forward Deployed Agent Builder") >= 18
+
+
+def test_title_negative_product_manager_penalised():
+    assert title_score("Product Manager, Developer Productivity") < 0
+
+
+def test_title_negative_does_not_fire_from_description():
+    # Title is clean; "product manager" only in the description must NOT penalise.
+    assert title_score("Senior Software Engineer", "You will partner with the product manager.") == 0
+
+
+def test_title_solutions_engineer_ai_not_penalised():
+    assert title_score("Solutions Engineer, AI") >= 0
+
+
+def test_title_director_penalised():
+    assert title_score("Director, Forward Deployed Engineering") < 0
+
+
+def test_title_solutions_architect_conditional_on_ai_context():
+    # No AI context -> no medium credit; with AI context -> credited.
+    assert title_score("Solutions Architect") == 0
+    assert title_score("Solutions Architect", "Work with Claude and LLM agents.") == 8
 
 
 if __name__ == "__main__":

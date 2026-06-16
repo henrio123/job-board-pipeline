@@ -36,7 +36,11 @@ import requests
 import yaml
 from dotenv import load_dotenv
 
-from shortlist import build_shortlist_payload
+from job_pipeline.classify import title_score
+from job_pipeline.location import derive_location_signal, location_adjustment
+from job_pipeline.matching import keyword_matches, keyword_score, normalize
+from job_pipeline.output import build_shortlist_payload
+from job_pipeline.sources import ADAPTERS
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -137,52 +141,22 @@ class Profile:
 # ---------------------------------------------------------------------------
 # Fetching
 # ---------------------------------------------------------------------------
-
-GREENHOUSE_URL = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs?content=true"
-LEVER_URL = "https://api.lever.co/v0/postings/{token}?mode=json"
+# The per-board HTTP + mapping lives in job_pipeline/sources/{greenhouse,lever}.
+# This orchestrator keeps the loop, pacing, error handling, and logging.
 
 
 def fetch_jobs(sources: list[dict[str, str]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for src in sources:
         company = src["company"]
-        try:
-            if src["type"] == "greenhouse":
-                resp = requests.get(GREENHOUSE_URL.format(token=src["token"]), timeout=20)
-                resp.raise_for_status()
-                jobs = resp.json().get("jobs", [])
-                for j in jobs:
-                    out.append(
-                        {
-                            "company": company,
-                            "title": j.get("title", ""),
-                            "location": (j.get("location") or {}).get("name", ""),
-                            "url": j.get("absolute_url", ""),
-                            "description": j.get("content", "") or "",
-                            "source": "greenhouse",
-                            "id": str(j.get("id", "")),
-                        }
-                    )
-            elif src["type"] == "lever":
-                resp = requests.get(LEVER_URL.format(token=src["token"]), timeout=20)
-                resp.raise_for_status()
-                jobs = resp.json() or []
-                for j in jobs:
-                    out.append(
-                        {
-                            "company": company,
-                            "title": j.get("text", ""),
-                            "location": (j.get("categories") or {}).get("location", ""),
-                            "url": j.get("hostedUrl", ""),
-                            "description": j.get("descriptionPlain", "") or "",
-                            "source": "lever",
-                            "id": str(j.get("id", "")),
-                        }
-                    )
-            else:
-                log.warning("Unknown source type %r for %s; skipping", src["type"], company)
-        except requests.RequestException as exc:
-            log.warning("Fetch failed for %s (%s): %s", company, src["type"], exc)
+        adapter = ADAPTERS.get(src["type"])
+        if adapter is None:
+            log.warning("Unknown source type %r for %s; skipping", src["type"], company)
+        else:
+            try:
+                out.extend(adapter(src["token"], company))
+            except requests.RequestException as exc:
+                log.warning("Fetch failed for %s (%s): %s", company, src["type"], exc)
         time.sleep(0.2)  # gentle pacing
     log.info("Fetched %d jobs across %d sources", len(out), len(sources))
     return out
@@ -191,28 +165,8 @@ def fetch_jobs(sources: list[dict[str, str]]) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Scoring
 # ---------------------------------------------------------------------------
-
-def normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", text.lower().strip())
-
-
-def keyword_matches(haystack: str, keyword: str) -> bool:
-    """True if keyword occurs in haystack as a whole word or phrase.
-
-    Case-insensitive. Multi-word keywords match as phrases with flexible
-    whitespace; hyphenated keywords ("on-chain") match literally. Alphanumeric
-    boundaries prevent short keywords from matching inside longer words
-    ("ai" must not match "email", "defi" must not match "defined").
-    """
-    pattern = r"\s+".join(re.escape(part) for part in keyword.lower().split())
-    return re.search(rf"(?<![a-z0-9]){pattern}(?![a-z0-9])", haystack.lower()) is not None
-
-
-def keyword_score(haystack: str, keywords: list[str], per_hit: float, cap: float) -> float:
-    if not keywords:
-        return 0.0
-    hits = sum(1 for kw in keywords if keyword_matches(haystack, kw))
-    return min(hits * per_hit, cap)
+# normalize / keyword_matches / keyword_score now live in job_pipeline.matching;
+# title_score in job_pipeline.classify (both imported above).
 
 
 def score_job(job: dict[str, Any], profile: Profile) -> int:
@@ -295,13 +249,22 @@ def write_outputs(jobs_scored: list[dict[str, Any]], profile: Profile) -> Path:
     with csv_path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(
             fh,
-            fieldnames=["score", "track", "company", "title", "location", "url", "source", "id"],
+            fieldnames=[
+                "score", "original_score", "adjusted_score",
+                "body_score", "title_score", "track",
+                "company", "title", "location",
+                "location_signal", "location_blockers", "location_notes",
+                "url", "source", "id",
+            ],
         )
         writer.writeheader()
         for row in jobs_scored:
-            writer.writerow(
-                {k: row.get(k, "") for k in writer.fieldnames}
-            )
+            out = {k: row.get(k, "") for k in writer.fieldnames}
+            # Flatten list-valued location fields for CSV cells.
+            for k in ("location_blockers", "location_notes"):
+                val = row.get(k, "")
+                out[k] = "; ".join(val) if isinstance(val, list) else val
+            writer.writerow(out)
 
     drafts_dir = OUTPUTS_DIR / f"drafts-{stamp}"
     drafts_dir.mkdir(exist_ok=True)
@@ -381,9 +344,27 @@ def run(args: argparse.Namespace) -> int:
 
     scored: list[dict[str, Any]] = []
     for job in jobs:
-        score = score_job(job, profile)
-        track = classify_track(score, profile)
-        row: dict[str, Any] = {**job, "score": score, "track": track}
+        body_score = score_job(job, profile)
+        t_score = title_score(job.get("title", ""), job.get("description", ""))
+        # original_score = pre-location total (body keyword score + title score).
+        original_score = body_score + t_score
+        loc = derive_location_signal(job.get("location", ""), job.get("description", ""))
+        adjusted_score = original_score + location_adjustment(loc["location_signal"])
+        # Track assignment uses the location-adjusted score; never delete a job
+        # purely on location — it is downranked and the blockers recorded.
+        track = classify_track(adjusted_score, profile)
+        row: dict[str, Any] = {
+            **job,
+            "body_score": body_score,
+            "title_score": t_score,
+            "original_score": original_score,
+            "adjusted_score": adjusted_score,
+            "score": adjusted_score,
+            "location_signal": loc["location_signal"],
+            "location_blockers": loc["location_blockers"],
+            "location_notes": loc["location_notes"],
+            "track": track,
+        }
         if track in {"A", "B"}:
             drafts = render_drafts(job, profile, track)
             row["email_draft"] = drafts["email"]
