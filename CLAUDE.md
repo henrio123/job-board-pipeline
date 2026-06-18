@@ -12,7 +12,8 @@ Public portfolio version of a job-search pipeline: fetch -> score -> classify ->
 - shortlist.py — pure stdlib helpers (no third-party imports): make_job_id() for stable job IDs, build_shortlist_payload() for the JSON payload. MUST stay dependency-free so it is testable without network, creds, or profile.yaml.
 - Keyword matching is word-boundary based via keyword_matches() (case-insensitive, phrase- and hyphen-aware; substring false positives like "ai" inside "email" do not score). Used by both keyword_score() and the deal-breaker check.
 - test_shortlist.py — 5 tests; test_scoring.py — 8 tests for word-boundary keyword matching. Both run under pytest or directly via `python3 <file>` (stdlib fallback).
-- Sources: Greenhouse and Lever public board APIs only. No scraping, RSS, or CSV input.
+- Sources: Greenhouse public board APIs, Lever public board APIs, and explicitly approved public/no-auth job APIs such as Agentic Engineering Jobs. No authenticated scraping, cookies, sessions, credentials, private APIs, or automated application submission. No HTML scraping, RSS, or CSV input.
+  - Approved public/no-auth source ids: `greenhouse`, `lever`, `agentic_engineering_jobs` (Agentic Engineering Jobs public REST API).
 - Latest public commit: bdc3d8f "Move watched company sources to local config" on origin/main (word-boundary scoring fix lands in the commit after it).
 
 ## 3. Safety and privacy rules
