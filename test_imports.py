@@ -16,7 +16,7 @@ from job_pipeline import (
     rank,
     recommend,
 )
-from job_pipeline.sources import ADAPTERS, greenhouse, lever
+from job_pipeline.sources import ADAPTERS, agentic, greenhouse, lever
 
 
 def test_core_modules_expose_expected_callables():
@@ -34,9 +34,10 @@ def test_core_modules_expose_expected_callables():
 
 
 def test_source_registry_present():
-    assert set(ADAPTERS) == {"greenhouse", "lever"}
+    assert set(ADAPTERS) == {"greenhouse", "lever", "agentic_engineering_jobs"}
     assert ADAPTERS["greenhouse"] is greenhouse.fetch
     assert ADAPTERS["lever"] is lever.fetch
+    assert ADAPTERS["agentic_engineering_jobs"] is agentic.fetch
 
 
 def test_shim_reexports_match_package():
