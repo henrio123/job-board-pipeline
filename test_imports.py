@@ -53,11 +53,23 @@ def test_models_dataclasses_instantiate():
     assert p.evidence_fit == "WEAK"
 
 
-def test_stubs_not_yet_implemented():
+def test_classifier_now_implemented():
+    # classify layer is live as of the audit task.
+    assert callable(classify.classify_role_family)
+    assert callable(classify.compute_pillars)
+    assert callable(classify.detect_hard_blockers)
+    assert callable(classify.assess)
+    a = classify.assess({"title": "Applied AI Engineer", "description": "", "location": ""}, "EU_ACTIONABLE")
+    assert a["role_family"] in classify.ROLE_FAMILIES
+    assert set(a) == {
+        "role_family", "pillars", "evidence_fit",
+        "positive_signals", "negative_signals", "hard_blockers",
+    }
+
+
+def test_remaining_stubs_not_yet_implemented():
+    # recommendation + normalization are still future tasks.
     for fn, args in (
-        (classify.classify_role_family, ({},)),
-        (classify.compute_pillars, ({},)),
-        (classify.detect_hard_blockers, ({},)),
         (recommend.recommend, (None,)),
         (normalize.normalize_posting, ({},)),
     ):
@@ -65,7 +77,7 @@ def test_stubs_not_yet_implemented():
             fn(*args)
         except NotImplementedError:
             continue
-        raise AssertionError(f"{fn.__name__} should raise NotImplementedError in scaffold phase")
+        raise AssertionError(f"{fn.__name__} should raise NotImplementedError")
 
 
 if __name__ == "__main__":

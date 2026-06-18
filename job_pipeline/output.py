@@ -14,6 +14,7 @@ from .location import SIG_UNCLEAR
 from .rank import _rank_score, select_company_diverse
 
 SCHEMA_VERSION = "1.1"
+AUDIT_SCHEMA_VERSION = "1.0"
 
 
 def make_job_id(source: str, source_id: str, company: str, title: str, url: str) -> str:
@@ -79,4 +80,46 @@ def build_shortlist_payload(jobs_scored: list[dict[str, Any]], generated_at: str
         "count": len(jobs),
         "jobs": jobs,
         "company_diverse": select_company_diverse(jobs),
+    }
+
+
+def audit_job(row: dict[str, Any]) -> dict[str, Any]:
+    """Project a scored+assessed row into the audit JSON shape (PII-free).
+
+    Reads classifier fields the caller attached (role_family, pillars,
+    evidence_fit, positive/negative signals, hard_blockers). Falls back safely
+    if a row was not assessed.
+    """
+    return {
+        "title": str(row.get("title", "") or ""),
+        "company": str(row.get("company", "") or ""),
+        "location": str(row.get("location", "") or ""),
+        "url": str(row.get("url", "") or ""),
+        "source": str(row.get("source", "") or ""),
+        "original_score": row.get("original_score", row.get("score")),
+        "adjusted_score": row.get("adjusted_score", row.get("score")),
+        "track": row.get("track"),
+        "location_signal": row.get("location_signal", SIG_UNCLEAR),
+        "role_family": row.get("role_family", "WEAK_ADJACENT"),
+        "pillars": dict(row.get("pillars", {}) or {}),
+        "evidence_fit": row.get("evidence_fit", "WEAK"),
+        "positive_signals": list(row.get("positive_signals", []) or []),
+        "negative_signals": list(row.get("negative_signals", []) or []),
+        "hard_blockers": list(row.get("hard_blockers", []) or []),
+        "raw": {"description": str(row.get("description", "") or "")},
+    }
+
+
+def build_audit_payload(jobs_scored: list[dict[str, Any]], generated_at: str) -> dict[str, Any]:
+    """Audit payload over ALL scored jobs (not just Track A/B), sorted by
+    adjusted_score descending. Classifier inspection layer — does not change
+    shortlist behaviour."""
+    rows = sorted(jobs_scored, key=_rank_score, reverse=True)
+    jobs = [audit_job(r) for r in rows]
+    return {
+        "schema_version": AUDIT_SCHEMA_VERSION,
+        "generated_at": generated_at,
+        "source": "job-board-pipeline",
+        "count": len(jobs),
+        "jobs": jobs,
     }

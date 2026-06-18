@@ -36,10 +36,10 @@ import requests
 import yaml
 from dotenv import load_dotenv
 
-from job_pipeline.classify import title_score
+from job_pipeline.classify import assess, title_score
 from job_pipeline.location import derive_location_signal, location_adjustment
 from job_pipeline.matching import keyword_matches, keyword_score, normalize
-from job_pipeline.output import build_shortlist_payload
+from job_pipeline.output import build_audit_payload, build_shortlist_payload
 from job_pipeline.sources import ADAPTERS
 
 # ---------------------------------------------------------------------------
@@ -282,7 +282,15 @@ def write_outputs(jobs_scored: list[dict[str, Any]], profile: Profile) -> Path:
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
-    log.info("Wrote %s, %s and %s", csv_path, drafts_dir, shortlist_path)
+    # Classifier audit output over ALL scored jobs (inspection only; does not
+    # change shortlist behaviour or Track A/B/C).
+    audit_path = OUTPUTS_DIR / "audit_jobs.json"
+    audit_payload = build_audit_payload(jobs_scored, datetime.now(timezone.utc).isoformat())
+    audit_path.write_text(
+        json.dumps(audit_payload, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    log.info("Wrote %s, %s, %s and %s", csv_path, drafts_dir, shortlist_path, audit_path)
     return csv_path
 
 
@@ -365,6 +373,8 @@ def run(args: argparse.Namespace) -> int:
             "location_notes": loc["location_notes"],
             "track": track,
         }
+        # Classifier audit layer (does not affect track/score/shortlist).
+        row.update(assess(job, loc["location_signal"]))
         if track in {"A", "B"}:
             drafts = render_drafts(job, profile, track)
             row["email_draft"] = drafts["email"]
